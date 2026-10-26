@@ -1,0 +1,66 @@
+name: Build VocalForge Lite
+
+on:
+  push:
+      branches: [ main, master ]
+          tags: [ 'v*' ]
+            pull_request:
+                branches: [ main, master ]
+                  workflow_dispatch:
+
+                  jobs:
+                    build:
+                        name: Build on ${{ matrix.os }}
+                            runs-on: ${{ matrix.os }}
+                                strategy:
+                                      matrix:
+                                              os: [windows-latest, macos-latest]
+                                                      include:
+                                                                - os: windows-latest
+                                                                            build_type: Release
+                                                                                        artifact_name: VocalForge-Lite-Windows
+                                                                                                    archive_ext: zip
+                                                                                                              - os: macos-latest
+                                                                                                                          build_type: Release
+                                                                                                                                      artifact_name: VocalForge-Lite-macOS
+                                                                                                                                                  archive_ext: zip
+
+                                                                                                                                                      steps:
+                                                                                                                                                            - name: Checkout repository
+                                                                                                                                                                    uses: actions/checkout@v4
+
+                                                                                                                                                                          - name: Install CMake
+                                                                                                                                                                                  uses: jwlawson/actions-setup-cmake@v2
+                                                                                                                                                                                          with:
+                                                                                                                                                                                                    cmake-version: '3.28'
+
+                                                                                                                                                                                                          - name: Cache JUCE
+                                                                                                                                                                                                                  uses: actions/cache@v4
+                                                                                                                                                                                                                          with:
+                                                                                                                                                                                                                                    path: _deps/juce-src
+                                                                                                                                                                                                                                              key: ${{ runner.os }}-juce-8.0.4
+
+                                                                                                                                                                                                                                                    - name: Configure CMake
+                                                                                                                                                                                                                                                            run: cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+
+                                                                                                                                                                                                                                                                  - name: Build
+                                                                                                                                                                                                                                                                          run: cmake --build build --config ${{ matrix.build_type }} --parallel
+
+                                                                                                                                                                                                                                                                                - name: Package Windows VST3
+                                                                                                                                                                                                                                                                                        if: matrix.os == 'windows-latest'
+                                                                                                                                                                                                                                                                                                run: |
+                                                                                                                                                                                                                                                                                                          cd build/Release
+                                                                                                                                                                                                                                                                                                                    powershell Compress-Archive -Path VocalForge.vst3 -DestinationPath ../../VocalForge-Lite-Windows.zip
+                                                                                                                                                                                                                                                                                                                            shell: bash
+
+                                                                                                                                                                                                                                                                                                                                  - name: Package macOS VST3
+                                                                                                                                                                                                                                                                                                                                          if: matrix.os == 'macos-latest'
+                                                                                                                                                                                                                                                                                                                                                  run: |
+                                                                                                                                                                                                                                                                                                                                                            cd build/Release
+                                                                                                                                                                                                                                                                                                                                                                      zip -r ../../VocalForge-Lite-macOS.zip VocalForge.vst3
+
+                                                                                                                                                                                                                                                                                                                                                                            - name: Upload artifact
+                                                                                                                                                                                                                                                                                                                                                                                    uses: actions/upload-artifact@v4
+                                                                                                                                                                                                                                                                                                                                                                                            with:
+                                                                                                                                                                                                                                                                                                                                                                                                      name: ${{ matrix.artifact_name }}
+                                                                                                                                                                                                                                                                                                                                                                                                                path: VocalForge-Lite-${{ matrix.os == 'windows-latest' && 'Windows' || 'macOS' }}.zip
